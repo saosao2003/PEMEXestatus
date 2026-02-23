@@ -30,7 +30,9 @@ creds = Credentials.from_service_account_info(
 
 client = gspread.authorize(creds)
 
-sheet = client.open(SHEET_NAME).sheet1
+sheet = client.open_by_key(
+    "1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4"
+).sheet1
 
 # ===== CARGAR DATOS =====
 
