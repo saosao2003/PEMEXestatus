@@ -18,7 +18,8 @@ SHEET_NAME = "Avance Migraciones 2026"
 # ===== GOOGLE SHEETS =====
 
 scope = [
-    "https://docs.google.com/spreadsheets/d/1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4/edit?gid=0#gid=0"
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
 ]
 
 cred_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
@@ -27,6 +28,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
     cred_json, scope)
 
 client = gspread.authorize(creds)
+
 sheet = client.open(SHEET_NAME).sheet1
 
 # ===== CARGAR DATOS =====
