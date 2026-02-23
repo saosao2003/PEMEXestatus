@@ -9,10 +9,10 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timedelta
 
-TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
-CHAT_ID = "834897782"
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+
 META = 266
-SHEET_NAME = "Avance Migraciones 2026"
 
 # ===== GOOGLE SHEETS =====
 
@@ -37,10 +37,13 @@ sheet = client.open_by_key(
 # ===== CARGAR DATOS =====
 
 def cargar_datos():
+
     data = sheet.get_all_records()
+
     df = pd.DataFrame(data)
 
     df['Fecha'] = pd.to_datetime(df['Fecha'])
+
     df = df.sort_values('Fecha')
 
     return df
@@ -161,7 +164,7 @@ Avance: {porcentaje:.2f}%
 
 # ===== REPORTE AUTOMATICO =====
 
-async def enviar_reporte_auto(app):
+async def enviar_reporte_auto():
 
     reporte = crear_reporte()
 
@@ -171,26 +174,24 @@ async def enviar_reporte_auto(app):
 
     await app.bot.send_photo(chat_id=CHAT_ID, photo=open(grafica, 'rb'))
 
-# ===== SCHEDULER =====
-
-scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
-
-# 20:00 hrs
-scheduler.add_job(
-    enviar_reporte_auto,
-    "cron",
-    hour=20,
-    minute=0,
-    args=[ApplicationBuilder().token(TOKEN).build()]
-)
-
-scheduler.start()
-
 # ===== MAIN =====
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(MessageHandler(filters.TEXT, responder))
+
+# ===== SCHEDULER =====
+
+scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
+
+scheduler.add_job(
+    enviar_reporte_auto,
+    "cron",
+    hour=20,
+    minute=0
+)
+
+scheduler.start()
 
 print("Bot corriendo 24/7...")
 
