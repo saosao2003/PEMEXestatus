@@ -1,18 +1,21 @@
-import gspread
 import os
 import json
+import gspread
+import threading
+from datetime import datetime, timedelta
+from flask import Flask
 from google.oauth2.service_account import Credentials
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, timedelta
+
+# ================= CONFIG =================
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-
 META = 266
 
-# ===== GOOGLE SHEETS =====
+# ================= GOOGLE SHEETS =================
 
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -32,11 +35,10 @@ sheet = client.open_by_key(
     "1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4"
 ).sheet1
 
-# ===== CARGAR DATOS SIN PANDAS =====
+# ================= FUNCIONES =================
 
 def cargar_datos():
     data = sheet.get_all_records()
-
     fechas = []
     migrados = []
 
@@ -46,16 +48,12 @@ def cargar_datos():
 
     return fechas, migrados
 
-# ===== KPI =====
 
 def calcular_kpi():
-
     fechas, migrados = cargar_datos()
 
     ultimo = migrados[-1]
-
     porcentaje = (ultimo / META) * 100
-
     faltan = META - ultimo
 
     incrementos = [
@@ -74,10 +72,8 @@ def calcular_kpi():
 
     return ultimo, porcentaje, faltan, promedio, fecha_estimada
 
-# ===== REPORTE =====
 
 def crear_reporte():
-
     migrados, porcentaje, faltan, promedio, fecha_estimada = calcular_kpi()
 
     return f"""
@@ -92,59 +88,58 @@ Promedio diario: {promedio:.2f}
 Meta estimada: {fecha_estimada}
 """
 
-# ===== TELEGRAM HANDLER =====
+
+# ================= TELEGRAM =================
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     texto = update.message.text.lower()
 
     if texto == "avance":
-
         await update.message.reply_text(crear_reporte())
 
     elif texto == "hoy":
-
         migrados, porcentaje, _, _, _ = calcular_kpi()
-
         await update.message.reply_text(
-            f"""
-📅 Hoy
-
-Migrados: {migrados}
-Avance: {porcentaje:.2f}%
-"""
+            f"📅 Hoy\n\nMigrados: {migrados}\nAvance: {porcentaje:.2f}%"
         )
 
     elif texto == "proyeccion":
-
         _, _, _, promedio, fecha_estimada = calcular_kpi()
-
         await update.message.reply_text(
             f"Meta estimada: {fecha_estimada}\nPromedio: {promedio:.2f}/día"
         )
 
-# ===== MAIN =====
+
+# ================= APP =================
 
 app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-app.add_handler(MessageHandler(filters.TEXT, responder))
-
-# ===== SCHEDULER =====
+# ================= SCHEDULER =================
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
 
 async def enviar_reporte_auto():
     await app.bot.send_message(chat_id=CHAT_ID, text=crear_reporte())
 
-scheduler.add_job(
-    enviar_reporte_auto,
-    "cron",
-    hour=20,
-    minute=0
-)
-
+scheduler.add_job(enviar_reporte_auto, "cron", hour=20, minute=0)
 scheduler.start()
 
-print("Bot optimizado corriendo 24/7 🚀")
+# ================= FLASK (PARA RENDER GRATIS) =================
 
+web_app = Flask(__name__)
+
+@web_app.route("/")
+def home():
+    return "Bot activo 🚀"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
+
+threading.Thread(target=run_web).start()
+
+# ================= START =================
+
+print("Bot optimizado funcionando 24/7 🚀")
 app.run_polling()
