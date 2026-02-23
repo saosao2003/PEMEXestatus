@@ -1,7 +1,7 @@
-python-telegram-bot==20.7
-pandas
-gspread
 oauth2client
-matplotlib
-apscheduler
-google-auth
+python-telegram-bot==20.7
+gspread==6.1.2
+google-auth==2.35.0
+pandas==2.2.2
+matplotlib==3.9.0
+apscheduler==3.10.4
