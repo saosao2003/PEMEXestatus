@@ -1,6 +1,4 @@
-import pandas as pd
 import gspread
-import matplotlib.pyplot as plt
 import os
 import json
 from google.oauth2.service_account import Credentials
@@ -34,37 +32,38 @@ sheet = client.open_by_key(
     "1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4"
 ).sheet1
 
-# ===== CARGAR DATOS =====
+# ===== CARGAR DATOS SIN PANDAS =====
 
 def cargar_datos():
-
     data = sheet.get_all_records()
 
-    df = pd.DataFrame(data)
+    fechas = []
+    migrados = []
 
-    df['Fecha'] = pd.to_datetime(df['Fecha'])
+    for fila in data:
+        fechas.append(datetime.strptime(fila["Fecha"], "%d/%m/%Y"))
+        migrados.append(int(fila["Migrados"]))
 
-    df = df.sort_values('Fecha')
-
-    return df
+    return fechas, migrados
 
 # ===== KPI =====
 
 def calcular_kpi():
 
-    df = cargar_datos()
+    fechas, migrados = cargar_datos()
 
-    ultimo = df.iloc[-1]
+    ultimo = migrados[-1]
 
-    migrados = int(ultimo['Migrados'])
+    porcentaje = (ultimo / META) * 100
 
-    porcentaje = (migrados / META) * 100
+    faltan = META - ultimo
 
-    faltan = META - migrados
+    incrementos = [
+        migrados[i] - migrados[i - 1]
+        for i in range(1, len(migrados))
+    ]
 
-    incremento_diario = df['Migrados'].diff()
-
-    promedio = incremento_diario.mean()
+    promedio = sum(incrementos) / len(incrementos) if incrementos else 0
 
     if promedio > 0:
         dias_restantes = faltan / promedio
@@ -73,33 +72,7 @@ def calcular_kpi():
     else:
         fecha_estimada = "Sin cálculo"
 
-    return migrados, porcentaje, faltan, promedio, fecha_estimada
-
-# ===== GRAFICA =====
-
-def generar_grafica():
-
-    df = cargar_datos()
-
-    plt.figure()
-
-    plt.plot(df['Fecha'], df['Migrados'])
-
-    plt.axhline(y=META)
-
-    plt.title("Avance Migraciones")
-
-    plt.xlabel("Fecha")
-
-    plt.ylabel("Migrados")
-
-    archivo = "grafica.png"
-
-    plt.savefig(archivo)
-
-    plt.close()
-
-    return archivo
+    return ultimo, porcentaje, faltan, promedio, fecha_estimada
 
 # ===== REPORTE =====
 
@@ -107,7 +80,7 @@ def crear_reporte():
 
     migrados, porcentaje, faltan, promedio, fecha_estimada = calcular_kpi()
 
-    reporte = f"""
+    return f"""
 📊 REPORTE DIARIO 20:00
 
 Migrados: {migrados}/{META}
@@ -119,8 +92,6 @@ Promedio diario: {promedio:.2f}
 Meta estimada: {fecha_estimada}
 """
 
-    return reporte
-
 # ===== TELEGRAM HANDLER =====
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -129,30 +100,20 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if texto == "avance":
 
-        reporte = crear_reporte()
-
-        await update.message.reply_text(reporte)
-
-        grafica = generar_grafica()
-
-        await update.message.reply_photo(photo=open(grafica, 'rb'))
+        await update.message.reply_text(crear_reporte())
 
     elif texto == "hoy":
 
-        df = cargar_datos()
+        migrados, porcentaje, _, _, _ = calcular_kpi()
 
-        ultimo = df.iloc[-1]
-
-        porcentaje = (ultimo['Migrados'] / META) * 100
-
-        respuesta = f"""
+        await update.message.reply_text(
+            f"""
 📅 Hoy
 
-Migrados: {ultimo['Migrados']}
+Migrados: {migrados}
 Avance: {porcentaje:.2f}%
 """
-
-        await update.message.reply_text(respuesta)
+        )
 
     elif texto == "proyeccion":
 
@@ -161,18 +122,6 @@ Avance: {porcentaje:.2f}%
         await update.message.reply_text(
             f"Meta estimada: {fecha_estimada}\nPromedio: {promedio:.2f}/día"
         )
-
-# ===== REPORTE AUTOMATICO =====
-
-async def enviar_reporte_auto():
-
-    reporte = crear_reporte()
-
-    grafica = generar_grafica()
-
-    await app.bot.send_message(chat_id=CHAT_ID, text=reporte)
-
-    await app.bot.send_photo(chat_id=CHAT_ID, photo=open(grafica, 'rb'))
 
 # ===== MAIN =====
 
@@ -184,6 +133,9 @@ app.add_handler(MessageHandler(filters.TEXT, responder))
 
 scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
 
+async def enviar_reporte_auto():
+    await app.bot.send_message(chat_id=CHAT_ID, text=crear_reporte())
+
 scheduler.add_job(
     enviar_reporte_auto,
     "cron",
@@ -193,6 +145,6 @@ scheduler.add_job(
 
 scheduler.start()
 
-print("Bot corriendo 24/7...")
+print("Bot optimizado corriendo 24/7 🚀")
 
 app.run_polling()
