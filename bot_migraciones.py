@@ -1,158 +1,145 @@
 import os
-import asyncio
-import logging
-from datetime import datetime
-
-import pandas as pd
+import json
+import gspread
+import threading
+from datetime import datetime, timedelta
+from flask import Flask
+from google.oauth2.service_account import Credentials
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# ==============================
-# CONFIGURACION
-# ==============================
+# ================= CONFIG =================
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+META = 266
 
-EXCEL_FILE = "migraciones.xlsx"
+# ================= GOOGLE SHEETS =================
 
-# ==============================
-# LOGGING
-# ==============================
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
 
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+cred_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+
+creds = Credentials.from_service_account_info(
+    cred_json,
+    scopes=scope
 )
 
-# ==============================
-# CARGAR EXCEL
-# ==============================
+client = gspread.authorize(creds)
 
-def cargar_excel():
-    try:
-        df = pd.read_excel(EXCEL_FILE)
-        df.columns = df.columns.str.upper().str.strip()
-        return df
-    except Exception as e:
-        logging.error(f"Error cargando Excel: {e}")
-        return pd.DataFrame()
+sheet = client.open_by_key(
+    "1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4"
+).sheet1
 
-# ==============================
-# RESUMEN GENERAL
-# ==============================
+# ================= FUNCIONES =================
 
-def resumen_general():
-    df = cargar_excel()
+def cargar_datos():
+    data = sheet.get_all_records()
+    fechas = []
+    migrados = []
 
-    if df.empty:
-        return "⚠ No hay datos cargados."
+    for fila in data:
+        fechas.append(datetime.strptime(fila["Fecha"], "%d/%m/%Y"))
+        migrados.append(int(fila["Migrados"]))
 
-    total = len(df)
-    completados = len(df[df["ESTADO"] == "COMPLETADO"])
-    pendientes = total - completados
-    avance = (completados / total) * 100
+    return fechas, migrados
 
-    return f"""
-📊 RESUMEN MIGRACIONES
 
-Total: {total}
-Completados: {completados}
-Pendientes: {pendientes}
+def calcular_kpi():
+    fechas, migrados = cargar_datos()
 
-Avance: {avance:.2f}%
-"""
+    ultimo = migrados[-1]
+    porcentaje = (ultimo / META) * 100
+    faltan = META - ultimo
 
-# ==============================
-# BUSQUEDA GENERICA
-# ==============================
-
-def buscar(valor):
-    df = cargar_excel()
-
-    if df.empty:
-        return "No hay datos."
-
-    resultado = df[
-        (df["IP"].astype(str) == valor) |
-        (df["SERIE"].astype(str) == valor) |
-        (df["SEDE"].astype(str).str.upper() == valor.upper())
+    incrementos = [
+        migrados[i] - migrados[i - 1]
+        for i in range(1, len(migrados))
     ]
 
-    if resultado.empty:
-        return "No encontrado."
+    promedio = sum(incrementos) / len(incrementos) if incrementos else 0
 
-    fila = resultado.iloc[0]
+    if promedio > 0:
+        dias_restantes = faltan / promedio
+        fecha_estimada = datetime.now() + timedelta(days=dias_restantes)
+        fecha_estimada = fecha_estimada.strftime("%d-%b-%Y")
+    else:
+        fecha_estimada = "Sin cálculo"
+
+    return ultimo, porcentaje, faltan, promedio, fecha_estimada
+
+
+def crear_reporte():
+    migrados, porcentaje, faltan, promedio, fecha_estimada = calcular_kpi()
 
     return f"""
-🔎 RESULTADO
+📊 REPORTE DIARIO 20:00
 
-IP: {fila['IP']}
-Serie: {fila['SERIE']}
-Sede: {fila['SEDE']}
-Estado: {fila['ESTADO']}
+Migrados: {migrados}/{META}
+Avance: {porcentaje:.2f}%
+Faltan: {faltan}
+
+Promedio diario: {promedio:.2f}
+
+Meta estimada: {fecha_estimada}
 """
 
-# ==============================
-# COMANDOS TELEGRAM
-# ==============================
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Bot Migraciones Activo")
+# ================= TELEGRAM =================
 
-async def resumen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    mensaje = resumen_general()
-    await update.message.reply_text(mensaje)
+async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    texto = update.message.text.lower()
 
-async def consulta(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Usa: /buscar valor")
-        return
+    if texto == "avance":
+        await update.message.reply_text(crear_reporte())
 
-    valor = context.args[0]
-    mensaje = buscar(valor)
-    await update.message.reply_text(mensaje)
+    elif texto == "hoy":
+        migrados, porcentaje, _, _, _ = calcular_kpi()
+        await update.message.reply_text(
+            f"📅 Hoy\n\nMigrados: {migrados}\nAvance: {porcentaje:.2f}%"
+        )
 
-# ==============================
-# ENVIO AUTOMATICO DIARIO
-# ==============================
+    elif texto == "proyeccion":
+        _, _, _, promedio, fecha_estimada = calcular_kpi()
+        await update.message.reply_text(
+            f"Meta estimada: {fecha_estimada}\nPromedio: {promedio:.2f}/día"
+        )
 
-async def envio_diario(app):
-    mensaje = resumen_general()
-    await app.bot.send_message(chat_id=CHAT_ID, text=mensaje)
 
-# ==============================
-# MAIN
-# ==============================
+# ================= APP =================
 
-scheduler = AsyncIOScheduler()
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-async def main():
+# ================= SCHEDULER =================
 
-    app = ApplicationBuilder().token(TOKEN).build()
+scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("resumen", resumen))
-    app.add_handler(CommandHandler("buscar", consulta))
+async def enviar_reporte_auto():
+    await app.bot.send_message(chat_id=CHAT_ID, text=crear_reporte())
 
-    scheduler.add_job(
-        envio_diario,
-        "cron",
-        hour=20,
-        minute=0,
-        args=[app]
-    )
+scheduler.add_job(enviar_reporte_auto, "cron", hour=20, minute=0)
+scheduler.start()
 
-    scheduler.start()
+# ================= FLASK (PARA RENDER GRATIS) =================
 
-    print("Bot iniciado correctamente")
+web_app = Flask(__name__)
 
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
+@web_app.route("/")
+def home():
+    return "Bot activo 🚀"
 
-    await asyncio.Event().wait()
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+threading.Thread(target=run_web).start()
+
+# ================= START =================
+
+print("Bot optimizado funcionando 24/7 🚀")
+app.run_polling()
