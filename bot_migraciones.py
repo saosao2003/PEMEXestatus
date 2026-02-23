@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from datetime import datetime, timedelta
 
-TOKEN = "TU_TOKEN_AQUI"
+TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 META = 266
 EXCEL_FILE = "./avance.xlsx"
 
