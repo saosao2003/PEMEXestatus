@@ -6,6 +6,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timedelta
+import os
+import json
+from oauth2client.service_account import ServiceAccountCredentials
 
 TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 CHAT_ID = "834897782"
@@ -18,8 +21,10 @@ scope = [
     "https://docs.google.com/spreadsheets/d/1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4/edit?gid=0#gid=0"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "credenciales.json", scope)
+cred_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    cred_json, scope)
 
 client = gspread.authorize(creds)
 sheet = client.open(SHEET_NAME).sheet1
