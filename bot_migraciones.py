@@ -1,145 +1,92 @@
 import os
-import json
-import gspread
-import threading
-from datetime import datetime, timedelta
-from flask import Flask
-from google.oauth2.service_account import Credentials
+import logging
+import asyncio
+from datetime import datetime
+
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-# ================= CONFIG =================
-
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-META = 266
-
-# ================= GOOGLE SHEETS =================
-
-scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-cred_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-
-creds = Credentials.from_service_account_info(
-    cred_json,
-    scopes=scope
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
 )
 
-client = gspread.authorize(creds)
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-sheet = client.open_by_key(
-    "1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4"
-).sheet1
+# ==============================
+# CONFIGURACIÓN
+# ==============================
 
-# ================= FUNCIONES =================
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-def cargar_datos():
-    data = sheet.get_all_records()
-    fechas = []
-    migrados = []
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
 
-    for fila in data:
-        fechas.append(datetime.strptime(fila["Fecha"], "%d/%m/%Y"))
-        migrados.append(int(fila["Migrados"]))
+logger = logging.getLogger(__name__)
 
-    return fechas, migrados
+# ==============================
+# COMANDOS TELEGRAM
+# ==============================
 
-
-def calcular_kpi():
-    fechas, migrados = cargar_datos()
-
-    ultimo = migrados[-1]
-    porcentaje = (ultimo / META) * 100
-    faltan = META - ultimo
-
-    incrementos = [
-        migrados[i] - migrados[i - 1]
-        for i in range(1, len(migrados))
-    ]
-
-    promedio = sum(incrementos) / len(incrementos) if incrementos else 0
-
-    if promedio > 0:
-        dias_restantes = faltan / promedio
-        fecha_estimada = datetime.now() + timedelta(days=dias_restantes)
-        fecha_estimada = fecha_estimada.strftime("%d-%b-%Y")
-    else:
-        fecha_estimada = "Sin cálculo"
-
-    return ultimo, porcentaje, faltan, promedio, fecha_estimada
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Bot activo y funcionando correctamente ✅"
+    )
 
 
-def crear_reporte():
-    migrados, porcentaje, faltan, promedio, fecha_estimada = calcular_kpi()
-
-    return f"""
-📊 REPORTE DIARIO 20:00
-
-Migrados: {migrados}/{META}
-Avance: {porcentaje:.2f}%
-Faltan: {faltan}
-
-Promedio diario: {promedio:.2f}
-
-Meta estimada: {fecha_estimada}
-"""
+async def estado(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await update.message.reply_text(f"Bot activo.\nHora servidor: {now}")
 
 
-# ================= TELEGRAM =================
+# ==============================
+# TAREA PROGRAMADA
+# ==============================
 
-async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    texto = update.message.text.lower()
-
-    if texto == "avance":
-        await update.message.reply_text(crear_reporte())
-
-    elif texto == "hoy":
-        migrados, porcentaje, _, _, _ = calcular_kpi()
-        await update.message.reply_text(
-            f"📅 Hoy\n\nMigrados: {migrados}\nAvance: {porcentaje:.2f}%"
-        )
-
-    elif texto == "proyeccion":
-        _, _, _, promedio, fecha_estimada = calcular_kpi()
-        await update.message.reply_text(
-            f"Meta estimada: {fecha_estimada}\nPromedio: {promedio:.2f}/día"
-        )
+async def tarea_programada():
+    logger.info("Ejecutando tarea programada...")
+    # Aquí puedes agregar lógica
+    # Ejemplo: revisar base de datos, enviar alertas, etc.
 
 
-# ================= APP =================
+# ==============================
+# MAIN ASYNC
+# ==============================
 
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
+async def main():
 
-# ================= SCHEDULER =================
+    # Crear scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        tarea_programada,
+        "interval",
+        minutes=5
+    )
 
-scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
+    scheduler.start()
 
-async def enviar_reporte_auto():
-    await app.bot.send_message(chat_id=CHAT_ID, text=crear_reporte())
+    # Crear aplicación Telegram
+    app = ApplicationBuilder().token(TOKEN).build()
 
-scheduler.add_job(enviar_reporte_auto, "cron", hour=20, minute=0)
-scheduler.start()
+    # Comandos
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("estado", estado))
 
-# ================= FLASK (PARA RENDER GRATIS) =================
+    logger.info("Bot iniciado correctamente")
 
-web_app = Flask(__name__)
+    # Iniciar bot
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
 
-@web_app.route("/")
-def home():
-    return "Bot activo 🚀"
+    # Mantener vivo
+    await asyncio.Event().wait()
 
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    web_app.run(host="0.0.0.0", port=port)
 
-threading.Thread(target=run_web).start()
+# ==============================
+# ENTRY POINT
+# ==============================
 
-# ================= START =================
-
-print("Bot optimizado funcionando 24/7 🚀")
-app.run_polling()
+if __name__ == "__main__":
+    asyncio.run(main())
