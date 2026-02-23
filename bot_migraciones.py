@@ -1,14 +1,13 @@
 import pandas as pd
 import gspread
 import matplotlib.pyplot as plt
+import os
+import json
 from google.oauth2.service_account import Credentials
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timedelta
-import os
-import json
-from oauth2client.service_account import ServiceAccountCredentials
 
 TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 CHAT_ID = "834897782"
