@@ -1,145 +1,118 @@
-import os
-import json
+import pandas as pd
 import gspread
-import threading
-from datetime import datetime, timedelta
-from flask import Flask
-from google.oauth2.service_account import Credentials
+from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from datetime import datetime, timedelta
 
-# ================= CONFIG =================
-
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 META = 266
+SHEET_NAME = "Avance Migraciones 2026"
 
-# ================= GOOGLE SHEETS =================
-
+# CONEXION GOOGLE SHEETS
 scope = [
-    "https://www.googleapis.com/auth/spreadsheets",
+    "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-cred_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-
-creds = Credentials.from_service_account_info(
-    cred_json,
-    scopes=scope
-)
+creds = ServiceAccountCredentials.from_json_keyfile_name(
+    "credenciales.json", scope)
 
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key(
-    "1xCqKEGKDqyfvFl7z4Fgy8pv2Js6ra1MfZAR5mS344A4"
-).sheet1
+sheet = client.open(SHEET_NAME).sheet1
 
-# ================= FUNCIONES =================
 
 def cargar_datos():
+
     data = sheet.get_all_records()
-    fechas = []
-    migrados = []
+    df = pd.DataFrame(data)
 
-    for fila in data:
-        fechas.append(datetime.strptime(fila["Fecha"], "%d/%m/%Y"))
-        migrados.append(int(fila["Migrados"]))
+    df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
 
-    return fechas, migrados
+    return df
 
 
-def calcular_kpi():
-    fechas, migrados = cargar_datos()
+def obtener_hoy(df):
 
-    ultimo = migrados[-1]
+    hoy = datetime.now().date()
+
+    fila = df[df['Fecha'].dt.date == hoy]
+
+    if fila.empty:
+        return "No hay datos cargados hoy"
+
+    return fila.to_string(index=False)
+
+
+def obtener_semana(df):
+
+    hoy = datetime.now()
+    inicio = hoy - timedelta(days=hoy.weekday())
+
+    semana = df[df['Fecha'] >= inicio]
+
+    return semana.to_string(index=False)
+
+
+def obtener_semana_pasada(df):
+
+    hoy = datetime.now()
+
+    inicio = hoy - timedelta(days=hoy.weekday() + 7)
+    fin = inicio + timedelta(days=6)
+
+    semana = df[(df['Fecha'] >= inicio) & (df['Fecha'] <= fin)]
+
+    return semana.to_string(index=False)
+
+
+def obtener_avance(df):
+
+    ultimo = df['Migrados'].dropna().iloc[-1]
+
     porcentaje = (ultimo / META) * 100
-    faltan = META - ultimo
-
-    incrementos = [
-        migrados[i] - migrados[i - 1]
-        for i in range(1, len(migrados))
-    ]
-
-    promedio = sum(incrementos) / len(incrementos) if incrementos else 0
-
-    if promedio > 0:
-        dias_restantes = faltan / promedio
-        fecha_estimada = datetime.now() + timedelta(days=dias_restantes)
-        fecha_estimada = fecha_estimada.strftime("%d-%b-%Y")
-    else:
-        fecha_estimada = "Sin cálculo"
-
-    return ultimo, porcentaje, faltan, promedio, fecha_estimada
-
-
-def crear_reporte():
-    migrados, porcentaje, faltan, promedio, fecha_estimada = calcular_kpi()
 
     return f"""
-📊 REPORTE DIARIO 20:00
-
-Migrados: {migrados}/{META}
-Avance: {porcentaje:.2f}%
-Faltan: {faltan}
-
-Promedio diario: {promedio:.2f}
-
-Meta estimada: {fecha_estimada}
+Avance actual: {ultimo}/{META}
+Porcentaje: {porcentaje:.2f}%
+Faltan: {META - ultimo}
 """
 
 
-# ================= TELEGRAM =================
-
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     texto = update.message.text.lower()
 
-    if texto == "avance":
-        await update.message.reply_text(crear_reporte())
+    df = cargar_datos()
 
-    elif texto == "hoy":
-        migrados, porcentaje, _, _, _ = calcular_kpi()
-        await update.message.reply_text(
-            f"📅 Hoy\n\nMigrados: {migrados}\nAvance: {porcentaje:.2f}%"
-        )
+    if texto == "hoy":
+        respuesta = obtener_hoy(df)
 
-    elif texto == "proyeccion":
-        _, _, _, promedio, fecha_estimada = calcular_kpi()
-        await update.message.reply_text(
-            f"Meta estimada: {fecha_estimada}\nPromedio: {promedio:.2f}/día"
-        )
+    elif texto == "semana":
+        respuesta = obtener_semana(df)
 
+    elif texto == "semana pasada":
+        respuesta = obtener_semana_pasada(df)
 
-# ================= APP =================
+    elif texto == "avance":
+        respuesta = obtener_avance(df)
+
+    else:
+        respuesta = """
+Comandos disponibles:
+
+hoy
+semana
+semana pasada
+avance
+"""
+
+    await update.message.reply_text(respuesta)
+
 
 app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
-# ================= SCHEDULER =================
+app.add_handler(MessageHandler(filters.TEXT, responder))
 
-scheduler = AsyncIOScheduler(timezone="America/Mexico_City")
-
-async def enviar_reporte_auto():
-    await app.bot.send_message(chat_id=CHAT_ID, text=crear_reporte())
-
-scheduler.add_job(enviar_reporte_auto, "cron", hour=20, minute=0)
-scheduler.start()
-
-# ================= FLASK (PARA RENDER GRATIS) =================
-
-web_app = Flask(__name__)
-
-@web_app.route("/")
-def home():
-    return "Bot activo 🚀"
-
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    web_app.run(host="0.0.0.0", port=port)
-
-threading.Thread(target=run_web).start()
-
-# ================= START =================
-
-print("Bot optimizado funcionando 24/7 🚀")
 app.run_polling()
