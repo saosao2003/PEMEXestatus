@@ -1,21 +1,11 @@
-import logging
-import asyncio
 import os
+import asyncio
+import logging
 from datetime import datetime
 
 import pandas as pd
-import matplotlib.pyplot as plt
-
-import gspread
-from google.oauth2.service_account import Credentials
-
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes
-)
-
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ==============================
@@ -23,179 +13,131 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 # ==============================
 
 TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
-
-SPREADSHEET_NAME = "Migraciones"
+EXCEL_FILE = "migraciones.xlsx"
 
 # ==============================
 # LOGGING
 # ==============================
 
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 
 # ==============================
-# GOOGLE SHEETS CONEXION
+# CARGAR EXCEL
 # ==============================
 
-def conectar_google_sheets():
-
-    creds = Credentials.from_service_account_file(
-        "credenciales.json",
-        scopes=SCOPES
-    )
-
-    client = gspread.authorize(creds)
-
-    sheet = client.open(SPREADSHEET_NAME).sheet1
-
-    return sheet
-
+def cargar_excel():
+    try:
+        df = pd.read_excel(EXCEL_FILE)
+        df.columns = df.columns.str.upper().str.strip()
+        return df
+    except Exception as e:
+        logging.error(f"Error cargando Excel: {e}")
+        return pd.DataFrame()
 
 # ==============================
-# LEER DATOS
+# RESUMEN GENERAL
 # ==============================
 
-def obtener_datos():
+def resumen_general():
+    df = cargar_excel()
 
-    sheet = conectar_google_sheets()
-
-    data = sheet.get_all_records()
-
-    df = pd.DataFrame(data)
-
-    return df
-
-
-# ==============================
-# CALCULAR ESTADO
-# ==============================
-
-def calcular_estado():
-
-    df = obtener_datos()
+    if df.empty:
+        return "⚠ No hay datos cargados."
 
     total = len(df)
-
-    if total == 0:
-        return "Sin registros"
-
-    completados = len(df[df["Estado"] == "COMPLETADO"])
-
-    porcentaje = (completados / total) * 100
+    completados = len(df[df["ESTADO"] == "COMPLETADO"])
+    pendientes = total - completados
+    avance = (completados / total) * 100
 
     return f"""
-Estado Migraciones
+📊 RESUMEN MIGRACIONES
 
 Total: {total}
 Completados: {completados}
-Pendientes: {total - completados}
+Pendientes: {pendientes}
 
-Avance: {porcentaje:.2f}%
+Avance: {avance:.2f}%
 """
 
-
 # ==============================
-# GENERAR GRAFICA
+# BUSQUEDA GENERICA
 # ==============================
 
-def generar_grafica():
+def buscar(valor):
+    df = cargar_excel()
 
-    df = obtener_datos()
+    if df.empty:
+        return "No hay datos."
 
-    conteo = df["Estado"].value_counts()
+    resultado = df[
+        (df["IP"].astype(str) == valor) |
+        (df["SERIE"].astype(str) == valor) |
+        (df["SEDE"].astype(str).str.upper() == valor.upper())
+    ]
 
-    plt.figure()
+    if resultado.empty:
+        return "No encontrado."
 
-    conteo.plot(kind="bar")
+    fila = resultado.iloc[0]
 
-    archivo = "grafica.png"
+    return f"""
+🔎 RESULTADO
 
-    plt.savefig(archivo)
-
-    plt.close()
-
-    return archivo
-
+IP: {fila['IP']}
+Serie: {fila['SERIE']}
+Sede: {fila['SEDE']}
+Estado: {fila['ESTADO']}
+"""
 
 # ==============================
 # COMANDOS TELEGRAM
 # ==============================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🤖 Bot Migraciones Activo")
 
-    await update.message.reply_text(
-        "Bot de Migraciones Activo"
-    )
-
-
-async def estado(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    mensaje = calcular_estado()
-
+async def resumen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mensaje = resumen_general()
     await update.message.reply_text(mensaje)
 
+async def consulta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usa: /buscar valor")
+        return
 
-async def grafica(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    archivo = generar_grafica()
-
-    await update.message.reply_photo(
-        photo=open(archivo, "rb")
-    )
-
-
-# ==============================
-# JOB AUTOMATICO 20:00 HRS
-# ==============================
-
-async def envio_automatico(app):
-
-    try:
-
-        chat_id = os.getenv("CHAT_ID")
-
-        mensaje = calcular_estado()
-
-        await app.bot.send_message(
-            chat_id=chat_id,
-            text=mensaje
-        )
-
-    except Exception as e:
-
-        logging.error(e)
-
+    valor = context.args[0]
+    mensaje = buscar(valor)
+    await update.message.reply_text(mensaje)
 
 # ==============================
-# SCHEDULER
+# ENVIO AUTOMATICO DIARIO
 # ==============================
 
-scheduler = AsyncIOScheduler()
-
+async def envio_diario(app):
+    mensaje = resumen_general()
+    await app.bot.send_message(chat_id=CHAT_ID, text=mensaje)
 
 # ==============================
 # MAIN
 # ==============================
 
+scheduler = AsyncIOScheduler()
+
 async def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # handlers
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("estado", estado))
-    app.add_handler(CommandHandler("grafica", grafica))
+    app.add_handler(CommandHandler("resumen", resumen))
+    app.add_handler(CommandHandler("buscar", consulta))
 
-    # scheduler diario 20:00
     scheduler.add_job(
-        envio_automatico,
+        envio_diario,
         "cron",
         hour=20,
         minute=0,
@@ -212,11 +154,5 @@ async def main():
 
     await asyncio.Event().wait()
 
-
-# ==============================
-# ARRANQUE
-# ==============================
-
 if __name__ == "__main__":
-
     asyncio.run(main())
