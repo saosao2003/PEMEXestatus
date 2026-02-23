@@ -21,22 +21,12 @@ def cargar_datos():
 
         if row[0] and row[1]:
 
-            # 👇 Si Excel ya lo trae como datetime
-            if isinstance(row[0], datetime):
-                fecha = row[0]
-            else:
-                # 👇 Si viene como texto
-                try:
-                    fecha = datetime.strptime(str(row[0]), "%d/%m/%Y")
-                except:
-                    fecha = datetime.strptime(str(row[0]), "%Y-%m-%d %H:%M:%S")
-
+            fecha = row[0]   # Excel ya lo entrega como datetime
             migrados = int(row[1])
 
             registros.append((fecha, migrados))
 
     return registros
-
 
 # ===== HOY =====
 
