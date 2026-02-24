@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 # CONFIG
 # =========================
 
-TOKEN = "TU_TOKEN_AQUI"
+TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 EXCEL_FILE = "./avance.xlsx"
 
 META_ENLACES = 266
