@@ -166,6 +166,7 @@ def comando_hoy():
 📅 {d["fecha"].strftime("%d-%b-%Y")}
 ━━━━━━━━━━━━━━━
 🔹 ENLACES
+
 Total Migrados: {d["enlaces"]}/{META_ENLACES}
 📡 Telmex: {d["enlaces_telmex"]}
 🌐 Totalplay: {d["enlaces_totalplay"]}
@@ -175,6 +176,7 @@ Ritmo promedio: {ritmo_enlaces:.2f}/día
 Proyección fin: {fecha_enlaces.strftime("%d-%b-%Y")}
 ━━━━━━━━━━━━━━━
 ⚖️ BALANCEADORES
+
 Total Instalados: {d["balanceadores"]}/{META_BALANCEADORES}
 📡 Telmex: {d["bal_telmex"]}
 🌐 Totalplay: {d["bal_totalplay"]}
