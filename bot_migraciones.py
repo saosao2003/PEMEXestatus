@@ -4,12 +4,20 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from datetime import datetime, timedelta
 
-TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
-META = 266
+# =========================
+# CONFIG
+# =========================
+
+TOKEN = "TU_TOKEN_AQUI"
 EXCEL_FILE = "./avance.xlsx"
 
+META_ENLACES = 266
+META_BALANCEADORES = 266
 
-# ===== CARGAR DATOS =====
+
+# =========================
+# CARGAR DATOS
+# =========================
 
 def cargar_datos():
 
@@ -20,80 +28,151 @@ def cargar_datos():
 
     for row in sheet.iter_rows(min_row=2, values_only=True):
 
-        if row[0] and row[1]:
-
-            fecha = row[0]
-            migrados = int(row[1])
-
-            telmex = int(row[2]) if row[2] else 0
-            totalplay = int(row[3]) if row[3] else 0
+        if row[0]:
 
             datos.append({
-                "fecha": fecha,
-                "migrados": migrados,
-                "telmex": telmex,
-                "totalplay": totalplay
+
+                "fecha": row[0],
+
+                "enlaces": int(row[1] or 0),
+                "enlaces_telmex": int(row[2] or 0),
+                "enlaces_totalplay": int(row[3] or 0),
+
+                "balanceadores": int(row[4] or 0),
+                "bal_telmex": int(row[5] or 0),
+                "bal_totalplay": int(row[6] or 0),
+
             })
+
+    datos.sort(key=lambda x: x["fecha"])
 
     return datos
 
 
-# ===== HOY =====
+# =========================
+# BARRA
+# =========================
+
+def barra(p):
+
+    llenos = int(p / 5)
+    vacios = 20 - llenos
+
+    return "█" * llenos + "░" * vacios
+
+
+# =========================
+# HOY
+# =========================
 
 def comando_hoy():
 
-    datos = cargar_datos()
+    d = cargar_datos()[-1]
 
-    ultimo = datos[-1]
-
-    porcentaje = (ultimo["migrados"] / META) * 100
+    porc_enlaces = d["enlaces"] / META_ENLACES * 100
+    porc_bal = d["balanceadores"] / META_BALANCEADORES * 100
 
     return f"""
-📅 Hoy: {ultimo["fecha"].strftime("%d-%b-%Y")}
+📅 {d["fecha"].strftime("%d-%b-%Y")}
 
-Migrados: {ultimo["migrados"]}
-Telmex: {ultimo["telmex"]}
-Totalplay: {ultimo["totalplay"]}
+🔹 ENLACES
+Total: {d["enlaces"]}
+📡 Telmex: {d["enlaces_telmex"]}
+🌐 Totalplay: {d["enlaces_totalplay"]}
+Avance: {porc_enlaces:.2f}%
 
-Avance: {porcentaje:.2f}%
+⚖️ BALANCEADORES
+Total: {d["balanceadores"]}
+📡 Telmex: {d["bal_telmex"]}
+🌐 Totalplay: {d["bal_totalplay"]}
+Avance: {porc_bal:.2f}%
 """
 
 
-# ===== AVANCE =====
+# =========================
+# AVANCE
+# =========================
 
 def comando_avance():
 
-    datos = cargar_datos()
+    d = cargar_datos()[-1]
 
-    migrados = datos[-1]["migrados"]
-
-    porcentaje = (migrados / META) * 100
-
-    barra = "█" * int(porcentaje/5) + "░" * (20-int(porcentaje/5))
+    porc_enlaces = d["enlaces"] / META_ENLACES * 100
+    porc_bal = d["balanceadores"] / META_BALANCEADORES * 100
 
     return f"""
-📊 AVANCE
+📊 AVANCE ENLACES
+{d["enlaces"]}/{META_ENLACES}
+{barra(porc_enlaces)}
+{porc_enlaces:.2f}%
 
-{migrados}/{META}
-{barra}
-{porcentaje:.2f}%
+⚖️ AVANCE BALANCEADORES
+{d["balanceadores"]}/{META_BALANCEADORES}
+{barra(porc_bal)}
+{porc_bal:.2f}%
 """
 
 
-# ===== FALTAN =====
+# =========================
+# DASHBOARD
+# =========================
+
+def comando_dashboard():
+
+    d = cargar_datos()[-1]
+
+    porc_enlaces = d["enlaces"] / META_ENLACES * 100
+    porc_bal = d["balanceadores"] / META_BALANCEADORES * 100
+
+    faltan_enlaces = META_ENLACES - d["enlaces"]
+    faltan_bal = META_BALANCEADORES - d["balanceadores"]
+
+    return f"""
+📊 DASHBOARD MIGRACIONES
+
+Fecha: {d["fecha"].strftime("%d-%b-%Y")}
+
+━━━━━━━━━━━━━━━━━━━
+
+ENLACES
+{d["enlaces"]}/{META_ENLACES}
+{barra(porc_enlaces)}
+Avance: {porc_enlaces:.2f}%
+Faltan: {faltan_enlaces}
+
+Telmex: {d["enlaces_telmex"]}
+Totalplay: {d["enlaces_totalplay"]}
+
+━━━━━━━━━━━━━━━━━━━
+
+BALANCEADORES
+{d["balanceadores"]}/{META_BALANCEADORES}
+{barra(porc_bal)}
+Avance: {porc_bal:.2f}%
+Faltan: {faltan_bal}
+
+Telmex: {d["bal_telmex"]}
+Totalplay: {d["bal_totalplay"]}
+"""
+
+
+# =========================
+# FALTAN
+# =========================
 
 def comando_faltan():
 
-    datos = cargar_datos()
+    d = cargar_datos()[-1]
 
-    migrados = datos[-1]["migrados"]
+    return f"""
+Faltan enlaces: {META_ENLACES - d["enlaces"]}
+Faltan balanceadores: {META_BALANCEADORES - d["balanceadores"]}
+"""
 
-    faltan = META - migrados
 
-    return f"Faltan {faltan} migraciones"
-
-
-# ===== SEMANA =====
+# =========================
+# SEMANA ACTUAL
+# =========================
 
 def comando_semana():
 
@@ -103,18 +182,20 @@ def comando_semana():
 
     inicio = hoy - timedelta(days=hoy.weekday())
 
-    texto = "📅 Semana actual\n\n"
+    texto = "📅 SEMANA ACTUAL\n\n"
 
     for d in datos:
 
         if d["fecha"] >= inicio:
 
-            texto += f'{d["fecha"].strftime("%d-%b")}: {d["migrados"]}\n'
+            texto += f'{d["fecha"].strftime("%d-%b")} | E:{d["enlaces"]} B:{d["balanceadores"]}\n'
 
     return texto
 
 
-# ===== SEMANA PASADA =====
+# =========================
+# SEMANA PASADA
+# =========================
 
 def comando_semana_pasada():
 
@@ -125,179 +206,185 @@ def comando_semana_pasada():
     inicio = hoy - timedelta(days=hoy.weekday()+7)
     fin = inicio + timedelta(days=6)
 
-    texto = "📅 Semana pasada\n\n"
+    texto = "📅 SEMANA PASADA\n\n"
 
     for d in datos:
 
         if inicio <= d["fecha"] <= fin:
 
-            texto += f'{d["fecha"].strftime("%d-%b")}: {d["migrados"]}\n'
+            texto += f'{d["fecha"].strftime("%d-%b")} | E:{d["enlaces"]} B:{d["balanceadores"]}\n'
 
     return texto
 
 
-# ===== DETALLE SEMANA =====
+# =========================
+# DETALLE SEMANA
+# =========================
 
 def comando_detalle_semana():
 
     datos = cargar_datos()
 
     hoy = datetime.now()
+
     inicio = hoy - timedelta(days=hoy.weekday())
 
-    total = 0
+    primero = None
+    ultimo = None
 
     for d in datos:
 
         if d["fecha"] >= inicio:
-            total += d["migrados"]
 
-    return f"Total semana actual: {total}"
+            if primero is None:
+                primero = d
+
+            ultimo = d
+
+    if primero and ultimo:
+
+        enlaces = ultimo["enlaces"] - primero["enlaces"]
+        bal = ultimo["balanceadores"] - primero["balanceadores"]
+
+        return f"""
+DETALLE SEMANA
+
+Enlaces migrados: {enlaces}
+Balanceadores migrados: {bal}
+"""
+
+    return "Sin datos semana"
 
 
-# ===== PROYECCION =====
+# =========================
+# PROYECCION
+# =========================
 
 def comando_proyeccion():
 
     datos = cargar_datos()
 
-    incrementos = []
+    inc_enlaces = []
+    inc_bal = []
 
     for i in range(1, len(datos)):
-        incrementos.append(
-            datos[i]["migrados"] - datos[i-1]["migrados"]
-        )
 
-    promedio = sum(incrementos) / len(incrementos)
+        inc_enlaces.append(datos[i]["enlaces"] - datos[i-1]["enlaces"])
+        inc_bal.append(datos[i]["balanceadores"] - datos[i-1]["balanceadores"])
 
-    faltan = META - datos[-1]["migrados"]
+    prom_enlaces = sum(inc_enlaces)/len(inc_enlaces)
+    prom_bal = sum(inc_bal)/len(inc_bal)
 
-    dias = faltan / promedio if promedio > 0 else 0
+    faltan_enlaces = META_ENLACES - datos[-1]["enlaces"]
+    faltan_bal = META_BALANCEADORES - datos[-1]["balanceadores"]
 
-    fecha_estimada = datetime.now() + timedelta(days=dias)
+    dias_enlaces = faltan_enlaces/prom_enlaces if prom_enlaces else 0
+    dias_bal = faltan_bal/prom_bal if prom_bal else 0
+
+    fecha_enlaces = datetime.now()+timedelta(days=dias_enlaces)
+    fecha_bal = datetime.now()+timedelta(days=dias_bal)
 
     return f"""
-📈 Proyección
+PROYECCION
 
-Promedio diario: {promedio:.2f}
-
-Meta estimada:
-{fecha_estimada.strftime("%d-%b-%Y")}
+Enlaces: {fecha_enlaces.strftime("%d-%b-%Y")}
+Balanceadores: {fecha_bal.strftime("%d-%b-%Y")}
 """
 
 
-# ===== GRAFICA =====
+# =========================
+# GRAFICA
+# =========================
 
 def generar_grafica():
 
     datos = cargar_datos()
 
     fechas = [d["fecha"] for d in datos]
-    migrados = [d["migrados"] for d in datos]
+    enlaces = [d["enlaces"] for d in datos]
+    bal = [d["balanceadores"] for d in datos]
 
     plt.figure()
 
-    plt.plot(fechas, migrados, marker="o")
+    plt.plot(fechas, enlaces)
+    plt.plot(fechas, bal)
 
-    plt.title("Avance Migraciones")
-
-    plt.xlabel("Fecha")
-    plt.ylabel("Migrados")
-
+    plt.title("Avance")
     plt.grid()
 
-    archivo = "grafica.png"
+    archivo="grafica.png"
 
     plt.savefig(archivo)
-
     plt.close()
 
     return archivo
 
 
-# ===== COMPARATIVO =====
-
-def generar_comparativo():
-
-    datos = cargar_datos()
-
-    fechas = [d["fecha"] for d in datos]
-    telmex = [d["telmex"] for d in datos]
-    totalplay = [d["totalplay"] for d in datos]
-
-    plt.figure()
-
-    plt.plot(fechas, telmex)
-    plt.plot(fechas, totalplay)
-
-    plt.title("Telmex vs Totalplay")
-
-    plt.xlabel("Fecha")
-    plt.ylabel("Migraciones")
-
-    plt.grid()
-
-    archivo = "comparativo.png"
-
-    plt.savefig(archivo)
-
-    plt.close()
-
-    return archivo
-
-
-# ===== TELEGRAM =====
+# =========================
+# TELEGRAM
+# =========================
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    texto = update.message.text.lower()
+    t = update.message.text.lower()
 
-    if texto == "hoy":
+    if t=="hoy":
         await update.message.reply_text(comando_hoy())
 
-    elif texto == "avance":
+    elif t=="avance":
         await update.message.reply_text(comando_avance())
 
-    elif texto == "faltan":
+    elif t=="dashboard":
+        await update.message.reply_text(comando_dashboard())
+
+    elif t=="faltan":
         await update.message.reply_text(comando_faltan())
 
-    elif texto == "semana":
+    elif t=="semana":
         await update.message.reply_text(comando_semana())
 
-    elif texto == "semana pasada":
+    elif t=="semana pasada":
         await update.message.reply_text(comando_semana_pasada())
 
-    elif texto == "detalle semana":
+    elif t=="detalle semana":
         await update.message.reply_text(comando_detalle_semana())
 
-    elif texto == "proyeccion":
+    elif t=="proyeccion":
         await update.message.reply_text(comando_proyeccion())
 
-    elif texto == "grafica":
+    elif t=="grafica":
 
-        archivo = generar_grafica()
+        archivo=generar_grafica()
 
-        await update.message.reply_photo(photo=open(archivo, "rb"))
-
-    elif texto == "comparativo":
-
-        archivo = generar_comparativo()
-
-        await update.message.reply_photo(photo=open(archivo, "rb"))
+        await update.message.reply_photo(photo=open(archivo,"rb"))
 
     else:
 
         await update.message.reply_text(
-            "Comandos:\nhoy\navance\nfaltan\nsemana\nsemana pasada\ndetalle semana\nproyeccion\ngrafica\ncomparativo"
-        )
+"""
+Comandos:
+
+dashboard
+hoy
+avance
+semana
+semana pasada
+detalle semana
+faltan
+proyeccion
+grafica
+"""
+)
 
 
-# ===== MAIN =====
+# =========================
+# RUN
+# =========================
 
 app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(MessageHandler(filters.TEXT, responder))
+app.add_handler(MessageHandler(filters.TEXT,responder))
 
-print("Bot PRO corriendo 🚀")
+print("BOT MIGRACIONES ACTIVO")
 
 app.run_polling(drop_pending_updates=True)
