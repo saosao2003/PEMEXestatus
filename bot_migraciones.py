@@ -60,17 +60,26 @@ def cargar_datos():
 
         fecha = convertir_fecha(row[0])
 
+        enlaces_telmex = int(row[1] or 0)
+        enlaces_totalplay = int(row[2] or 0)
+
+        bal_telmex = int(row[3] or 0)
+        bal_totalplay = int(row[4] or 0)
+
         datos.append({
             "fecha": fecha,
-            "telmex": int(row[1] or 0),
-            "totalplay": int(row[2] or 0),
-            "balanceador_telmex": int(row[3] or 0),
-            "balanceador_totalplay": int(row[4] or 0),
+
+            "enlaces": enlaces_telmex + enlaces_totalplay,
+            "enlaces_telmex": enlaces_telmex,
+            "enlaces_totalplay": enlaces_totalplay,
+
+            "balanceadores": bal_telmex + bal_totalplay,
+            "bal_telmex": bal_telmex,
+            "bal_totalplay": bal_totalplay
         })
 
     wb.close()
 
-    # ORDENAR CORRECTAMENTE
     datos.sort(key=lambda x: x["fecha"])
 
     return datos
