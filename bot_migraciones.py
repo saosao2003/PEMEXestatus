@@ -34,8 +34,8 @@ FERIADOS = [datetime.strptime(d, "%Y-%m-%d").date() for d in FERIADOS]
 MENU = """
 📊 MENU MIGRACIONES
 
-1️⃣ Hoy           4️⃣ Semana pasada
-2️⃣ Dashboard  5️⃣ Detalle semana
+1️⃣ Hoy             4️⃣ Semana pasada
+2️⃣ Dashboard 5️⃣ Detalle semana
 3️⃣ Semana      6️⃣ Gráfica
 """
 
