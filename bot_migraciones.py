@@ -167,8 +167,8 @@ def comando_hoy():
 ━━━━━━━━━━━━━━━
 🔹 ENLACES
 Total Migrados: {d["enlaces"]}/{META_ENLACES}
-Telmex: {d["enlaces_telmex"]}
-Totalplay: {d["enlaces_totalplay"]}
+📡 Telmex: {d["enlaces_telmex"]}
+🌐 Totalplay: {d["enlaces_totalplay"]}
 
 Avance: {porc_enlaces:.2f}%
 Ritmo promedio: {ritmo_enlaces:.2f}/día
@@ -176,8 +176,8 @@ Proyección fin: {fecha_enlaces.strftime("%d-%b-%Y")}
 ━━━━━━━━━━━━━━━
 ⚖️ BALANCEADORES
 Total Instalados: {d["balanceadores"]}/{META_BALANCEADORES}
-Telmex: {d["bal_telmex"]}
-Totalplay: {d["bal_totalplay"]}
+📡 Telmex: {d["bal_telmex"]}
+🌐 Totalplay: {d["bal_totalplay"]}
 
 Avance: {porc_bal:.2f}%
 Ritmo promedio: {ritmo_bal:.2f}/día
@@ -317,8 +317,8 @@ def run_health():
 # =========================
 # RUN
 # =========================
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT,responder))
-threading.Thread(target=run_health,daemon=True).start()
-print("BOT ACTIVO")
-app.run_polling(drop_pending_updates=True)
+app = ApplicationBuilder().token(TOKEN).concurrent_updates(False).build()
+app.add_handler(MessageHandler(filters.TEXT, responder))
+threading.Thread(target=run_health, daemon=True).start()
+print("BOT MIGRACIONES ACTIVO")
+app.run_polling(drop_pending_updates=True, close_loop=False)
