@@ -317,10 +317,80 @@ def run_health():
     server.serve_forever()
 
 # =========================
-# RUN
+# WEBHOOK SERVER
 # =========================
-app = ApplicationBuilder().token(TOKEN).concurrent_updates(False).build()
+
+from telegram.ext import Application
+from telegram import Bot
+import asyncio
+import os
+
+RENDER_URL = "https://pemexestatus.onrender.com"  # CAMBIA ESTO
+WEBHOOK_PATH = f"/webhook/{TOKEN}"
+WEBHOOK_URL = f"{RENDER_URL}{WEBHOOK_PATH}"
+
+PORT = int(os.environ.get("PORT", 10000))
+
+
+class WebhookHandler(BaseHTTPRequestHandler):
+
+    def do_POST(self):
+
+        if self.path == WEBHOOK_PATH:
+
+            length = int(self.headers.get('content-length'))
+            body = self.rfile.read(length)
+
+            asyncio.run(app.update_queue.put(
+                Update.de_json(
+                    eval(body.decode()),
+                    app.bot
+                )
+            ))
+
+            self.send_response(200)
+            self.end_headers()
+
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+
+    def do_GET(self):
+
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"BOT MIGRACIONES ACTIVO")
+
+
+# =========================
+# INICIAR BOT
+# =========================
+
+app = ApplicationBuilder().token(TOKEN).build()
+
 app.add_handler(MessageHandler(filters.TEXT, responder))
-threading.Thread(target=run_health, daemon=True).start()
-print("BOT MIGRACIONES ACTIVO")
-app.run_polling(drop_pending_updates=True, close_loop=False)
+
+
+async def setup_webhook():
+
+    await app.initialize()
+
+    await app.bot.set_webhook(WEBHOOK_URL)
+
+    print("Webhook configurado en:")
+    print(WEBHOOK_URL)
+
+
+def run():
+
+    asyncio.run(setup_webhook())
+
+    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
+
+    print("BOT MIGRACIONES ACTIVO VIA WEBHOOK")
+
+    server.serve_forever()
+
+
+run()
