@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import threading
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from openpyxl import load_workbook
 from datetime import datetime, timedelta
@@ -9,7 +10,9 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # =========================
 # CONFIG
 # =========================
-TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
+TOKEN = os.environ.get("BOT_TOKEN")
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
+PORT = int(os.environ.get("PORT", 10000))
 EXCEL_FILE = "./avance.xlsx"
 
 META_ENLACES = 266
@@ -317,80 +320,22 @@ def run_health():
     server.serve_forever()
 
 # =========================
-# WEBHOOK SERVER
+# RUN WEBHOOK
 # =========================
 
-from telegram.ext import Application
-from telegram import Bot
-import asyncio
-import os
 
-RENDER_URL = "https://pemexestatus.onrender.com"  # CAMBIA ESTO
-WEBHOOK_PATH = f"/webhook/{TOKEN}"
-WEBHOOK_URL = f"{RENDER_URL}{WEBHOOK_PATH}"
-
+TOKEN = os.environ.get("BOT_TOKEN")
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
 PORT = int(os.environ.get("PORT", 10000))
-
-
-class WebhookHandler(BaseHTTPRequestHandler):
-
-    def do_POST(self):
-
-        if self.path == WEBHOOK_PATH:
-
-            length = int(self.headers.get('content-length'))
-            body = self.rfile.read(length)
-
-            asyncio.run(app.update_queue.put(
-                Update.de_json(
-                    eval(body.decode()),
-                    app.bot
-                )
-            ))
-
-            self.send_response(200)
-            self.end_headers()
-
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-
-    def do_GET(self):
-
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"BOT MIGRACIONES ACTIVO")
-
-
-# =========================
-# INICIAR BOT
-# =========================
 
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(MessageHandler(filters.TEXT, responder))
 
+print("BOT MIGRACIONES ACTIVO WEBHOOK")
 
-async def setup_webhook():
-
-    await app.initialize()
-
-    await app.bot.set_webhook(WEBHOOK_URL)
-
-    print("Webhook configurado en:")
-    print(WEBHOOK_URL)
-
-
-def run():
-
-    asyncio.run(setup_webhook())
-
-    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
-
-    print("BOT MIGRACIONES ACTIVO VIA WEBHOOK")
-
-    server.serve_forever()
-
-
-run()
+app.run_webhook(
+    listen="0.0.0.0",
+    port=PORT,
+    webhook_url=f"{RENDER_EXTERNAL_URL}/{TOKEN}"
+)
