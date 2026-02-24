@@ -71,11 +71,11 @@ def cargar_datos():
 
             fecha = convertir_fecha(row[0])
 
-            enlaces_telmex = int(row[1] or 0)
-            enlaces_totalplay = int(row[2] or 0)
+            enlaces_telmex = int(row[2] or 0)
+            enlaces_totalplay = int(row[3] or 0)
 
-            bal_telmex = int(row[3] or 0)
-            bal_totalplay = int(row[4] or 0)
+            bal_telmex = int(row[5] or 0)
+            bal_totalplay = int(row[6] or 0)
 
             datos.append({
 
