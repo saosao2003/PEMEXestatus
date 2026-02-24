@@ -1,18 +1,16 @@
-import openpyxl
 import matplotlib.pyplot as plt
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from openpyxl import load_workbook
-from datetime import datetime
+from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-from datetime import datetime, timedelta
 
 # =========================
 # CONFIG
 # =========================
 
-TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
+TOKEN = "TU_TOKEN_AQUI"
 EXCEL_FILE = "./avance.xlsx"
 
 META_ENLACES = 266
@@ -20,7 +18,7 @@ META_BALANCEADORES = 266
 
 
 # =========================
-# CARGAR DATOS
+# CONVERTIR FECHA
 # =========================
 
 def convertir_fecha(valor):
@@ -43,40 +41,58 @@ def convertir_fecha(valor):
         except:
             pass
 
-    raise ValueError(f"Formato de fecha no soportado: {valor}")
+    raise ValueError(f"Formato fecha no soportado: {valor}")
 
+
+# =========================
+# CARGAR EXCEL ROBUSTO
+# =========================
 
 def cargar_datos():
 
-    wb = load_workbook(EXCEL_FILE, data_only=True)
-    ws = wb.active
-
     datos = []
+
+    try:
+
+        wb = load_workbook(EXCEL_FILE, data_only=True)
+        ws = wb.active
+
+    except Exception as e:
+
+        print("Error abriendo Excel:", e)
+        return []
 
     for row in ws.iter_rows(min_row=2, values_only=True):
 
-        if not row[0]:
-            continue
+        try:
 
-        fecha = convertir_fecha(row[0])
+            if not row[0]:
+                continue
 
-        enlaces_telmex = int(row[1] or 0)
-        enlaces_totalplay = int(row[2] or 0)
+            fecha = convertir_fecha(row[0])
 
-        bal_telmex = int(row[3] or 0)
-        bal_totalplay = int(row[4] or 0)
+            enlaces_telmex = int(row[1] or 0)
+            enlaces_totalplay = int(row[2] or 0)
 
-        datos.append({
-            "fecha": fecha,
+            bal_telmex = int(row[3] or 0)
+            bal_totalplay = int(row[4] or 0)
 
-            "enlaces": enlaces_telmex + enlaces_totalplay,
-            "enlaces_telmex": enlaces_telmex,
-            "enlaces_totalplay": enlaces_totalplay,
+            datos.append({
 
-            "balanceadores": bal_telmex + bal_totalplay,
-            "bal_telmex": bal_telmex,
-            "bal_totalplay": bal_totalplay
-        })
+                "fecha": fecha,
+
+                "enlaces": enlaces_telmex + enlaces_totalplay,
+                "enlaces_telmex": enlaces_telmex,
+                "enlaces_totalplay": enlaces_totalplay,
+
+                "balanceadores": bal_telmex + bal_totalplay,
+                "bal_telmex": bal_telmex,
+                "bal_totalplay": bal_totalplay
+            })
+
+        except Exception as e:
+
+            print("Error fila:", row, e)
 
     wb.close()
 
@@ -84,8 +100,9 @@ def cargar_datos():
 
     return datos
 
+
 # =========================
-# BARRA
+# BARRA PROGRESO
 # =========================
 
 def barra(p):
@@ -102,7 +119,12 @@ def barra(p):
 
 def comando_hoy():
 
-    d = cargar_datos()[-1]
+    datos = cargar_datos()
+
+    if not datos:
+        return "Sin datos"
+
+    d = datos[-1]
 
     porc_enlaces = d["enlaces"] / META_ENLACES * 100
     porc_bal = d["balanceadores"] / META_BALANCEADORES * 100
@@ -130,7 +152,12 @@ Avance: {porc_bal:.2f}%
 
 def comando_avance():
 
-    d = cargar_datos()[-1]
+    datos = cargar_datos()
+
+    if not datos:
+        return "Sin datos"
+
+    d = datos[-1]
 
     porc_enlaces = d["enlaces"] / META_ENLACES * 100
     porc_bal = d["balanceadores"] / META_BALANCEADORES * 100
@@ -154,7 +181,12 @@ def comando_avance():
 
 def comando_dashboard():
 
-    d = cargar_datos()[-1]
+    datos = cargar_datos()
+
+    if not datos:
+        return "Sin datos"
+
+    d = datos[-1]
 
     porc_enlaces = d["enlaces"] / META_ENLACES * 100
     porc_bal = d["balanceadores"] / META_BALANCEADORES * 100
@@ -167,7 +199,7 @@ def comando_dashboard():
 
 Fecha: {d["fecha"].strftime("%d-%b-%Y")}
 
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━
 
 ENLACES
 {d["enlaces"]}/{META_ENLACES}
@@ -178,7 +210,7 @@ Faltan: {faltan_enlaces}
 Telmex: {d["enlaces_telmex"]}
 Totalplay: {d["enlaces_totalplay"]}
 
-━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━
 
 BALANCEADORES
 {d["balanceadores"]}/{META_BALANCEADORES}
@@ -197,7 +229,12 @@ Totalplay: {d["bal_totalplay"]}
 
 def comando_faltan():
 
-    d = cargar_datos()[-1]
+    datos = cargar_datos()
+
+    if not datos:
+        return "Sin datos"
+
+    d = datos[-1]
 
     return f"""
 Faltan enlaces: {META_ENLACES - d["enlaces"]}
@@ -213,8 +250,10 @@ def comando_semana():
 
     datos = cargar_datos()
 
-    hoy = datetime.now()
+    if not datos:
+        return "Sin datos"
 
+    hoy = datetime.now()
     inicio = hoy - timedelta(days=hoy.weekday())
 
     texto = "📅 SEMANA ACTUAL\n\n"
@@ -235,6 +274,9 @@ def comando_semana():
 def comando_semana_pasada():
 
     datos = cargar_datos()
+
+    if not datos:
+        return "Sin datos"
 
     hoy = datetime.now()
 
@@ -260,8 +302,10 @@ def comando_detalle_semana():
 
     datos = cargar_datos()
 
-    hoy = datetime.now()
+    if not datos:
+        return "Sin datos"
 
+    hoy = datetime.now()
     inicio = hoy - timedelta(days=hoy.weekday())
 
     primero = None
@@ -278,14 +322,11 @@ def comando_detalle_semana():
 
     if primero and ultimo:
 
-        enlaces = ultimo["enlaces"] - primero["enlaces"]
-        bal = ultimo["balanceadores"] - primero["balanceadores"]
-
         return f"""
 DETALLE SEMANA
 
-Enlaces migrados: {enlaces}
-Balanceadores migrados: {bal}
+Enlaces migrados: {ultimo["enlaces"] - primero["enlaces"]}
+Balanceadores migrados: {ultimo["balanceadores"] - primero["balanceadores"]}
 """
 
     return "Sin datos semana"
@@ -298,6 +339,9 @@ Balanceadores migrados: {bal}
 def comando_proyeccion():
 
     datos = cargar_datos()
+
+    if len(datos) < 2:
+        return "Sin suficientes datos"
 
     inc_enlaces = []
     inc_bal = []
@@ -313,11 +357,8 @@ def comando_proyeccion():
     faltan_enlaces = META_ENLACES - datos[-1]["enlaces"]
     faltan_bal = META_BALANCEADORES - datos[-1]["balanceadores"]
 
-    dias_enlaces = faltan_enlaces/prom_enlaces if prom_enlaces else 0
-    dias_bal = faltan_bal/prom_bal if prom_bal else 0
-
-    fecha_enlaces = datetime.now()+timedelta(days=dias_enlaces)
-    fecha_bal = datetime.now()+timedelta(days=dias_bal)
+    fecha_enlaces = datetime.now()+timedelta(days=faltan_enlaces/prom_enlaces if prom_enlaces else 0)
+    fecha_bal = datetime.now()+timedelta(days=faltan_bal/prom_bal if prom_bal else 0)
 
     return f"""
 PROYECCION
@@ -344,7 +385,7 @@ def generar_grafica():
     plt.plot(fechas, enlaces)
     plt.plot(fechas, bal)
 
-    plt.title("Avance")
+    plt.title("Avance Migraciones")
     plt.grid()
 
     archivo="grafica.png"
@@ -370,7 +411,12 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(comando_avance())
 
     elif t=="dashboard":
+
         await update.message.reply_text(comando_dashboard())
+
+        archivo = generar_grafica()
+
+        await update.message.reply_photo(photo=open(archivo,"rb"))
 
     elif t=="faltan":
         await update.message.reply_text(comando_faltan())
@@ -397,15 +443,15 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.reply_text(
 """
-Comandos:
+Comandos disponibles:
 
 dashboard
 hoy
 avance
+faltan
 semana
 semana pasada
 detalle semana
-faltan
 proyeccion
 grafica
 """
@@ -413,16 +459,8 @@ grafica
 
 
 # =========================
-# RUN
+# HEALTHCHECK RENDER
 # =========================
-
-app = ApplicationBuilder().token(TOKEN).build()
-
-app.add_handler(MessageHandler(filters.TEXT,responder))
-
-print("BOT MIGRACIONES ACTIVO")
-
-app.run_polling(drop_pending_updates=True)
 
 class HealthCheck(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -431,8 +469,20 @@ class HealthCheck(BaseHTTPRequestHandler):
         self.wfile.write(b"OK")
 
 def run_health():
-    port = 10000
-    server = HTTPServer(("0.0.0.0", port), HealthCheck)
+    server = HTTPServer(("0.0.0.0", 10000), HealthCheck)
     server.serve_forever()
 
-threading.Thread(target=run_health).start()
+
+# =========================
+# RUN
+# =========================
+
+app = ApplicationBuilder().token(TOKEN).build()
+
+app.add_handler(MessageHandler(filters.TEXT, responder))
+
+threading.Thread(target=run_health, daemon=True).start()
+
+print("BOT MIGRACIONES ACTIVO")
+
+app.run_polling(drop_pending_updates=True)
