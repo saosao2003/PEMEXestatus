@@ -53,12 +53,9 @@ def cargar_datos():
     datos = []
 
     try:
-
         wb = load_workbook(EXCEL_FILE, data_only=True)
         ws = wb.active
-
     except Exception as e:
-
         print("Error abriendo Excel:", e)
         return []
 
@@ -67,6 +64,10 @@ def cargar_datos():
         try:
 
             if not row[0]:
+                continue
+
+            # IGNORAR FILAS SEMANA
+            if isinstance(row[0], str) and "semana" in row[0].lower():
                 continue
 
             fecha = convertir_fecha(row[0])
@@ -78,7 +79,6 @@ def cargar_datos():
             bal_totalplay = int(row[6] or 0)
 
             datos.append({
-
                 "fecha": fecha,
 
                 "enlaces": enlaces_telmex + enlaces_totalplay,
@@ -91,7 +91,6 @@ def cargar_datos():
             })
 
         except Exception as e:
-
             print("Error fila:", row, e)
 
     wb.close()
@@ -99,7 +98,6 @@ def cargar_datos():
     datos.sort(key=lambda x: x["fecha"])
 
     return datos
-
 
 # =========================
 # BARRA PROGRESO
@@ -477,7 +475,7 @@ def run_health():
 # RUN
 # =========================
 
-app = ApplicationBuilder().token(TOKEN).build()
+app = ApplicationBuilder().token(TOKEN).concurrent_updates(False).build()
 
 app.add_handler(MessageHandler(filters.TEXT, responder))
 
@@ -485,4 +483,4 @@ threading.Thread(target=run_health, daemon=True).start()
 
 print("BOT MIGRACIONES ACTIVO")
 
-app.run_polling(drop_pending_updates=True)
+app.run_polling(drop_pending_updates=True, close_loop=False)
