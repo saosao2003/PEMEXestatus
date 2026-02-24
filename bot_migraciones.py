@@ -197,6 +197,8 @@ def comando_dashboard():
     return f"""
 📊 DASHBOARD
 
+Fecha: {d["fecha"].strftime("%d-%b-%Y")}
+
 ENLACES MIGRADOS
 {d["enlaces"]}/{META_ENLACES}
 {barra(porc_enlaces)}
