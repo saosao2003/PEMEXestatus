@@ -34,8 +34,8 @@ FERIADOS = [datetime.strptime(d, "%Y-%m-%d").date() for d in FERIADOS]
 MENU = """
 📊 MENU MIGRACIONES
 
-1️⃣ Hoy         4️⃣ Semana pasada
-2️⃣ Dashboard   5️⃣ Detalle semana
+1️⃣ Hoy           4️⃣ Semana pasada
+2️⃣ Dashboard  5️⃣ Detalle semana
 3️⃣ Semana      6️⃣ Gráfica
 """
 
@@ -101,34 +101,32 @@ def barra(p):
     return "█"*llenos + "░"*vacios
 
 # =========================
-# RITMO PROMEDIO 7 DÍAS HÁBILES
+# RITMO PROMEDIO TODOS LOS DÍAS HÁBILES
 # =========================
 def calcular_ritmo():
     datos = cargar_datos()
     if len(datos) < 2:
         return 0,0
 
-    hoy = datetime.now().date()
-    limite = hoy - timedelta(days=7)  # últimos 7 días
-    inc_enlaces, inc_bal = 0, 0
-    dias_habiles = 0
+    inc_enlaces = []
+    inc_bal = []
 
-    for d in datos:
-        fecha = d["fecha"].date()
-        if limite <= fecha <= hoy and fecha.weekday() < 5 and fecha not in FERIADOS:
-            inc_enlaces += d["enlaces"]
-            inc_bal += d["balanceadores"]
-            dias_habiles += 1
+    for i in range(1, len(datos)):
+        fecha = datos[i]["fecha"].date()
+        if fecha.weekday() < 5 and fecha not in FERIADOS:  # solo días hábiles
+            inc_enlaces.append(datos[i]["enlaces"] - datos[i-1]["enlaces"])
+            inc_bal.append(datos[i]["balanceadores"] - datos[i-1]["balanceadores"])
 
-    if dias_habiles == 0:
-        return 0,0
+    if not inc_enlaces or not inc_bal:
+        return 0, 0
 
-    prom_enlaces = inc_enlaces / dias_habiles
-    prom_bal = inc_bal / dias_habiles
+    prom_enlaces = sum(inc_enlaces) / len(inc_enlaces)
+    prom_bal = sum(inc_bal) / len(inc_bal)
+
     return prom_enlaces, prom_bal
 
 # =========================
-# HOY (CON PROYECCION)
+# HOY (CON PROYECCIÓN)
 # =========================
 def comando_hoy():
     datos = cargar_datos()
@@ -173,7 +171,7 @@ Telmex: {d["enlaces_telmex"]}
 Totalplay: {d["enlaces_totalplay"]}
 
 Avance: {porc_enlaces:.2f}%
-Ritmo promedio (últimos 7 días hábiles): {ritmo_enlaces:.2f}/día
+Ritmo promedio: {ritmo_enlaces:.2f}/día
 Proyección fin: {fecha_enlaces.strftime("%d-%b-%Y")}
 ━━━━━━━━━━━━━━━
 ⚖️ BALANCEADORES
@@ -182,7 +180,7 @@ Telmex: {d["bal_telmex"]}
 Totalplay: {d["bal_totalplay"]}
 
 Avance: {porc_bal:.2f}%
-Ritmo promedio (últimos 7 días hábiles): {ritmo_bal:.2f}/día
+Ritmo promedio: {ritmo_bal:.2f}/día
 Proyección fin: {fecha_bal.strftime("%d-%b-%Y")}
 """
 
@@ -203,7 +201,7 @@ ENLACES MIGRADOS
 {d["enlaces"]}/{META_ENLACES}
 {barra(porc_enlaces)}
 {porc_enlaces:.2f}%
-
+━━━━━━━━━━━━━━━
 BALANCEADORES INSTALADOS
 {d["balanceadores"]}/{META_BALANCEADORES}
 {barra(porc_bal)}
