@@ -1,5 +1,9 @@
 import openpyxl
 import matplotlib.pyplot as plt
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from openpyxl import load_workbook
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from datetime import datetime, timedelta
@@ -19,35 +23,57 @@ META_BALANCEADORES = 266
 # CARGAR DATOS
 # =========================
 
+def convertir_fecha(valor):
+
+    if isinstance(valor, datetime):
+        return valor
+
+    valor = str(valor).strip()
+
+    formatos = [
+        "%d/%m/%Y",
+        "%Y-%m-%d",
+        "%Y-%m-%d %H:%M:%S",
+        "%d-%b-%Y"
+    ]
+
+    for formato in formatos:
+        try:
+            return datetime.strptime(valor, formato)
+        except:
+            pass
+
+    raise ValueError(f"Formato de fecha no soportado: {valor}")
+
+
 def cargar_datos():
 
-    wb = openpyxl.load_workbook(EXCEL_FILE)
-    sheet = wb.active
+    wb = load_workbook(EXCEL_FILE, data_only=True)
+    ws = wb.active
 
     datos = []
 
-    for row in sheet.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=2, values_only=True):
 
-        if row[0]:
+        if not row[0]:
+            continue
 
-            datos.append({
+        fecha = convertir_fecha(row[0])
 
-                "fecha": row[0],
+        datos.append({
+            "fecha": fecha,
+            "telmex": int(row[1] or 0),
+            "totalplay": int(row[2] or 0),
+            "balanceador_telmex": int(row[3] or 0),
+            "balanceador_totalplay": int(row[4] or 0),
+        })
 
-                "enlaces": int(row[1] or 0),
-                "enlaces_telmex": int(row[2] or 0),
-                "enlaces_totalplay": int(row[3] or 0),
+    wb.close()
 
-                "balanceadores": int(row[4] or 0),
-                "bal_telmex": int(row[5] or 0),
-                "bal_totalplay": int(row[6] or 0),
-
-            })
-
+    # ORDENAR CORRECTAMENTE
     datos.sort(key=lambda x: x["fecha"])
 
     return datos
-
 
 # =========================
 # BARRA
@@ -388,3 +414,16 @@ app.add_handler(MessageHandler(filters.TEXT,responder))
 print("BOT MIGRACIONES ACTIVO")
 
 app.run_polling(drop_pending_updates=True)
+
+class HealthCheck(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+def run_health():
+    port = 10000
+    server = HTTPServer(("0.0.0.0", port), HealthCheck)
+    server.serve_forever()
+
+threading.Thread(target=run_health).start()
