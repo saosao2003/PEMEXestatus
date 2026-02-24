@@ -26,7 +26,7 @@ MENU = """
 
 1️⃣ Hoy         4️⃣ Semana pasada
 2️⃣ Dashboard   5️⃣ Detalle semana
-3️⃣ Semana actual 6️⃣ Gráfica
+3️⃣ Semana      6️⃣ Gráfica
 """
 
 
@@ -171,7 +171,6 @@ def comando_hoy():
 
     return f"""
 📅 {d["fecha"].strftime("%d-%b-%Y")}
-
 ━━━━━━━━━━━━━━━
 🔹 ENLACES
 Total Migrados: {d["enlaces"]}/{META_ENLACES}
@@ -208,11 +207,13 @@ def comando_dashboard():
     return f"""
 📊 DASHBOARD
 
-ENLACES
+ENLACES MIGRADOS
+{d["enlaces"]}/{META_ENLACES}
 {barra(porc_enlaces)}
 {porc_enlaces:.2f}%
 
-BALANCEADORES
+BALANCEADORES INSTALADOS
+{d["balanceadores"]}/{META_BALANCEADORES}
 {barra(porc_bal)}
 {porc_bal:.2f}%
 """
@@ -270,7 +271,7 @@ def comando_semana_pasada():
 
             encontrados=True
 
-            texto+=f'{d["fecha"].strftime("%d-%b")}  E:{d["enlaces"]}  B:{d["balanceadores"]}\n'
+            texto+=f'{d["fecha"].strftime("%d-%b")}  Enlaces:{d["enlaces"]}  Balanceadores:{d["balanceadores"]}\n'
 
     if not encontrados:
         return "Sin datos semana pasada"
