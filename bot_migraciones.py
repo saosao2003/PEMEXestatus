@@ -131,13 +131,13 @@ def comando_hoy():
 📅 {d["fecha"].strftime("%d-%b-%Y")}
 
 🔹 ENLACES
-Total: {d["enlaces"]}
+Total Migrados: {d["enlaces"]}
 📡 Telmex: {d["enlaces_telmex"]}
 🌐 Totalplay: {d["enlaces_totalplay"]}
 Avance: {porc_enlaces:.2f}%
 
 ⚖️ BALANCEADORES
-Total: {d["balanceadores"]}
+Total Instalados: {d["balanceadores"]}
 📡 Telmex: {d["bal_telmex"]}
 🌐 Totalplay: {d["bal_totalplay"]}
 Avance: {porc_bal:.2f}%
