@@ -1,19 +1,6 @@
-import matplotlib.pyplot as plt
-import threading
-import asyncio
-import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from openpyxl import load_workbook
-from datetime import datetime, timedelta
-
+import pandas as pd
 from telegram import Update
-from telegram.ext import (
-    Application,
-    MessageHandler,
-    CommandHandler,
-    filters,
-    ContextTypes,
-)
+from telegram.ext import Application, MessageHandler, filters, CommandHandler, CallbackContext
 
 # =========================
 # CONFIG
@@ -21,8 +8,6 @@ from telegram.ext import (
 
 TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 EXCEL_FILE = "./avance.xlsx"
-
-WEBHOOK_URL = "https://pemexestatus.onrender.com"
 
 META_ENLACES = 266
 META_BALANCEADORES = 266
@@ -399,39 +384,17 @@ def run_health():
 # MAIN WEBHOOK
 # =========================
 
-async def main():
-
-    PORT = int(os.environ.get("PORT", 10000))
-
+def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    threading.Thread(target=run_health, daemon=True).start()
-
-    print(f"BOT PEMEX ESTATUS ACTIVO en puerto {PORT}")
-
-    await app.initialize()
-
-    await app.bot.set_webhook(
-        url=f"{WEBHOOK_URL}/{TOKEN}"
-    )
-
-    await app.start()
-
-    await app.updater.start_webhook(
-
-        listen="0.0.0.0",
-        port=PORT,
-        url_path=TOKEN,
-        webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
-
-    )
-
-    await asyncio.Event().wait()
-
+    print("🤖 Bot en ejecución...")
+    app.run_webhook(listen="0.0.0.0",
+                port=8443,
+                url_path=TOKEN,
+                webhook_url=f"https://pemexestatus.onrender.com/{TOKEN}")
 
 if __name__ == "__main__":
-
-    asyncio.run(main())
+    main()
