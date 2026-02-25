@@ -1,7 +1,9 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler, CallbackContext
+from openpyxl import load_workbook
 
 # =========================
 # CONFIG
