@@ -1,5 +1,5 @@
 import pandas as pd
-import matplotlib.pyplot as plt
+from telegram.ext import ContextTypes
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler, CallbackContext
@@ -369,7 +369,7 @@ def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
     print("🤖 Bot en ejecución...")
     app.run_webhook(listen="0.0.0.0",
