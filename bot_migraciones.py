@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import threading
-import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from openpyxl import load_workbook
 from datetime import datetime, timedelta
@@ -10,9 +9,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 # =========================
 # CONFIG
 # =========================
-TOKEN = os.environ.get("BOT_TOKEN")
-RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
-PORT = int(os.environ.get("PORT", 10000))
+TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 EXCEL_FILE = "./avance.xlsx"
 
 META_ENLACES = 266
@@ -320,22 +317,10 @@ def run_health():
     server.serve_forever()
 
 # =========================
-# RUN WEBHOOK
+# RUN
 # =========================
-
-
-TOKEN = os.environ.get("BOT_TOKEN")
-RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL")
-PORT = int(os.environ.get("PORT", 10000))
-
-app = ApplicationBuilder().token(TOKEN).build()
-
+app = ApplicationBuilder().token(TOKEN).concurrent_updates(False).build()
 app.add_handler(MessageHandler(filters.TEXT, responder))
-
-print("BOT MIGRACIONES ACTIVO WEBHOOK")
-
-app.run_webhook(
-    listen="0.0.0.0",
-    port=PORT,
-    webhook_url=f"{RENDER_EXTERNAL_URL}/{TOKEN}"
-)
+threading.Thread(target=run_health, daemon=True).start()
+print("BOT MIGRACIONES ACTIVO")
+app.run_polling(drop_pending_updates=True, close_loop=False)
