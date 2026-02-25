@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import threading
 import asyncio
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from openpyxl import load_workbook
 from datetime import datetime, timedelta
@@ -399,10 +400,14 @@ def run_health():
 # =========================
 
 
+
+
 def main():
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+    PORT = int(os.environ.get("PORT", 8443))
 
     app = Application.builder().token(TOKEN).build()
 
@@ -411,12 +416,12 @@ def main():
 
     threading.Thread(target=run_health, daemon=True).start()
 
-    print("BOT PEMEX ESTATUS ACTIVO WEBHOOK")
+    print(f"BOT PEMEX ESTATUS ACTIVO WEBHOOK en puerto {PORT}")
 
     app.run_webhook(
 
         listen="0.0.0.0",
-        port=8443,
+        port=PORT,
         url_path=TOKEN,
 
         webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
