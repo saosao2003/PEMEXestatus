@@ -399,15 +399,9 @@ def run_health():
 # MAIN WEBHOOK
 # =========================
 
+async def main():
 
-
-
-def main():
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    PORT = int(os.environ.get("PORT", 8443))
+    PORT = int(os.environ.get("PORT", 10000))
 
     app = Application.builder().token(TOKEN).build()
 
@@ -416,14 +410,28 @@ def main():
 
     threading.Thread(target=run_health, daemon=True).start()
 
-    print(f"BOT PEMEX ESTATUS ACTIVO WEBHOOK en puerto {PORT}")
+    print(f"BOT PEMEX ESTATUS ACTIVO en puerto {PORT}")
 
-    app.run_webhook(
+    await app.initialize()
+
+    await app.bot.set_webhook(
+        url=f"{WEBHOOK_URL}/{TOKEN}"
+    )
+
+    await app.start()
+
+    await app.updater.start_webhook(
 
         listen="0.0.0.0",
         port=PORT,
         url_path=TOKEN,
-
-        webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
+        webhook_url=f"{WEBHOOK_URL}/{TOKEN}",
 
     )
+
+    await asyncio.Event().wait()
+
+
+if __name__ == "__main__":
+
+    asyncio.run(main())
