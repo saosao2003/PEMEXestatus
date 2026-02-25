@@ -360,28 +360,6 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# HEALTHCHECK
-# =========================
-
-class HealthCheck(BaseHTTPRequestHandler):
-
-    def do_GET(self):
-
-        self.send_response(200)
-
-        self.end_headers()
-
-        self.wfile.write(b"OK")
-
-
-def run_health():
-
-    server = HTTPServer(("0.0.0.0",10000),HealthCheck)
-
-    server.serve_forever()
-
-
-# =========================
 # MAIN WEBHOOK
 # =========================
 
