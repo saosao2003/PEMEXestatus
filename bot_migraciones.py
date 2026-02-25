@@ -36,18 +36,13 @@ FERIADOS = [datetime.strptime(d, "%Y-%m-%d").date() for d in FERIADOS]
 # =========================
 # MENU
 # =========================
-
 MENU = """
 📊 MENU MIGRACIONES
 
-1️⃣ Hoy
-2️⃣ Dashboard
-3️⃣ Semana actual
-4️⃣ Semana pasada
-5️⃣ Detalle semana
-6️⃣ Gráfica
+1️⃣ Hoy             4️⃣ Semana pasada
+2️⃣ Dashboard 5️⃣ Detalle semana
+3️⃣ Semana      6️⃣ Gráfica
 """
-
 # =========================
 # CONVERTIR FECHA
 # =========================
@@ -184,33 +179,62 @@ def calcular_ritmo():
 # =========================
 
 def comando_hoy():
-
     datos = cargar_datos()
-
     if not datos:
         return "Sin datos"
 
     d = datos[-1]
-
     porc_enlaces = d["enlaces"]/META_ENLACES*100
     porc_bal = d["balanceadores"]/META_BALANCEADORES*100
-
     ritmo_enlaces, ritmo_bal = calcular_ritmo()
+
+    # calcular días hábiles restantes para proyección
+    fecha_actual = datetime.now()
+    faltan_enlaces = META_ENLACES - d["enlaces"]
+    faltan_bal = META_BALANCEADORES - d["balanceadores"]
+
+    dias_enlaces = 0
+    dias_bal = 0
+    temp_fecha = fecha_actual
+    while faltan_enlaces > 0:
+        temp_fecha += timedelta(days=1)
+        if temp_fecha.weekday() < 5 and temp_fecha.date() not in FERIADOS:
+            faltan_enlaces -= ritmo_enlaces
+            dias_enlaces += 1
+
+    temp_fecha = fecha_actual
+    while faltan_bal > 0:
+        temp_fecha += timedelta(days=1)
+        if temp_fecha.weekday() < 5 and temp_fecha.date() not in FERIADOS:
+            faltan_bal -= ritmo_bal
+            dias_bal += 1
+
+    fecha_enlaces = fecha_actual + timedelta(days=dias_enlaces)
+    fecha_bal = fecha_actual + timedelta(days=dias_bal)
 
     return f"""
 📅 {d["fecha"].strftime("%d-%b-%Y")}
+━━━━━━━━━━━━━━━
+🔹 ENLACES
 
-ENLACES
-{d["enlaces"]}/{META_ENLACES}
+Total Migrados: {d["enlaces"]}/{META_ENLACES}
+📡 Telmex: {d["enlaces_telmex"]}
+🌐 Totalplay: {d["enlaces_totalplay"]}
+
 Avance: {porc_enlaces:.2f}%
-Ritmo: {ritmo_enlaces:.2f}/día
+Ritmo promedio: {ritmo_enlaces:.2f}/día
+Proyección fin: {fecha_enlaces.strftime("%d-%b-%Y")}
+━━━━━━━━━━━━━━━
+⚖️ BALANCEADORES
 
-BALANCEADORES
-{d["balanceadores"]}/{META_BALANCEADORES}
+Total Instalados: {d["balanceadores"]}/{META_BALANCEADORES}
+📡 Telmex: {d["bal_telmex"]}
+🌐 Totalplay: {d["bal_totalplay"]}
+
 Avance: {porc_bal:.2f}%
-Ritmo: {ritmo_bal:.2f}/día
+Ritmo promedio: {ritmo_bal:.2f}/día
+Proyección fin: {fecha_bal.strftime("%d-%b-%Y")}
 """
-
 
 def comando_dashboard():
 
@@ -224,50 +248,47 @@ def comando_dashboard():
     return f"""
 📊 DASHBOARD
 
-ENLACES
+Fecha: {d["fecha"].strftime("%d-%b-%Y")}
+
+ENLACES MIGRADOS
+{d["enlaces"]}/{META_ENLACES}
 {barra(porc_enlaces)}
 {porc_enlaces:.2f}%
-
-BALANCEADORES
+━━━━━━━━━━━━━━━
+BALANCEADORES INSTALADOS
+{d["balanceadores"]}/{META_BALANCEADORES}
 {barra(porc_bal)}
 {porc_bal:.2f}%
 """
 
-
 def comando_semana_actual():
-
     datos = cargar_datos()
-
     hoy = datetime.now()
-
     inicio = hoy - timedelta(days=hoy.weekday())
-
-    texto = "SEMANA ACTUAL\n"
-
+    texto = "📅 SEMANA ACTUAL\n\n"
+    encontrados = False
     for d in datos:
         if d["fecha"] >= inicio:
-            texto += f'{d["fecha"].strftime("%d-%b")} E:{d["enlaces"]} B:{d["balanceadores"]}\n'
-
+            encontrados = True
+            texto += f'{d["fecha"].strftime("%d-%b")}  E:{d["enlaces"]}  B:{d["balanceadores"]}\n'
+    if not encontrados:
+        return "Sin datos esta semana"
     return texto
 
 
 def comando_semana_pasada():
-
     datos = cargar_datos()
-
     hoy = datetime.now()
-
     inicio = hoy - timedelta(days=hoy.weekday()+7)
     fin = inicio + timedelta(days=6)
-
-    texto = "SEMANA PASADA\n"
-
+    texto = "📅 SEMANA PASADA\n\n"
+    encontrados = False
     for d in datos:
-
         if inicio <= d["fecha"] <= fin:
-
-            texto += f'{d["fecha"].strftime("%d-%b")} E:{d["enlaces"]} B:{d["balanceadores"]}\n'
-
+            encontrados = True
+            texto += f'{d["fecha"].strftime("%d-%b")}  Enlaces:{d["enlaces"]}  Balanceadores:{d["balanceadores"]}\n'
+    if not encontrados:
+        return "Sin datos semana pasada"
     return texto
 
 
