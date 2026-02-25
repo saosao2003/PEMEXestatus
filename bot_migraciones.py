@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import threading
+import asyncio
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from openpyxl import load_workbook
 from datetime import datetime, timedelta
@@ -397,12 +398,15 @@ def run_health():
 # MAIN WEBHOOK
 # =========================
 
+
 def main():
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, responder))
 
     threading.Thread(target=run_health, daemon=True).start()
@@ -418,8 +422,3 @@ def main():
         webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
 
     )
-
-
-if __name__ == "__main__":
-
-    main()
