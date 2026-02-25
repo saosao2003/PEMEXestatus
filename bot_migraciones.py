@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 from telegram.ext import ContextTypes
 from datetime import datetime, timedelta
 from telegram import Update
