@@ -270,7 +270,7 @@ def comando_semana_actual():
     for d in datos:
         if d["fecha"] >= inicio:
             encontrados = True
-            texto += f'{d["fecha"].strftime("%d-%b")}  E:{d["enlaces"]}  B:{d["balanceadores"]}\n'
+            texto += f'{d["fecha"].strftime("%d-%b")}  Enlaces:{d["enlaces"]}  Balanceadores:{d["balanceadores"]}\n'
     if not encontrados:
         return "Sin datos esta semana"
     return texto
