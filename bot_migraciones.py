@@ -212,6 +212,9 @@ def comando_hoy():
     fecha_enlaces = fecha_actual + timedelta(days=dias_enlaces)
     fecha_bal = fecha_actual + timedelta(days=dias_bal)
 
+    faltan_enlaces = META_ENLACES - d["enlaces"]
+    faltan_bal = META_BALANCEADORES - d["balanceadores"]
+
     return f"""
 📅 {d["fecha"].strftime("%d-%b-%Y")}
 ━━━━━━━━━━━━━━━
