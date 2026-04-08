@@ -13,8 +13,8 @@ from openpyxl import load_workbook
 TOKEN = "8261058843:AAFEGmNVrrxon3n4fJ6nc5DAXaULcSiNZgE"
 EXCEL_FILE = "./avance.xlsx"
 
-META_ENLACES = 266
-META_BALANCEADORES = 266
+META_ENLACES = 263
+META_BALANCEADORES = 263
 
 # =========================
 # FERIADOS
